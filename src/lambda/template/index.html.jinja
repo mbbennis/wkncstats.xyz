@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+  <head>
+    <title>wknc stats</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico"/>
+    <link rel="stylesheet" type="text/css" href="style/style.css"/>
+  </head>
+  <body>
+    <main>
+      <h1>WKNC Stats</h1>
+      <p><a href=https://wknc.org target="_blank">wknc.org</a> | FM 88.1</p>
+      <p>A summary of the last month, updated daily</p>
+      <div class="trending">
+        <h2>Trending artists</h2>
+        <table>
+          {% for artist, value in trending_artists %}
+          <tr>
+            {% if value >= 15 %}
+              {% set trend_color = "trend-color-1" -%}
+						{% elif value >= 10 -%}
+              {% set trend_color = "trend-color-2" -%}
+            {% else -%}
+              {% set trend_color = "trend-color-3" -%}
+            {% endif -%}
+            <td class="trending-left">{{ artist }}</td>
+            <td class="trending-right {{ trend_color }}">+{{ value }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div>
+        <h2>Most played artists</h2>
+        <table>
+          <tr>
+            <th>Artist</th>
+            <th>Count</th>
+          </tr>
+          {% for artist, value in top_artists %}
+          <tr>
+            <td>{{ artist }}</td>
+            <td>{{ value }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div>
+        <h2>Most played songs</h2>
+        <table>
+          <tr>
+            <th>Song</th>
+            <th>Artist</th>
+            <th>Count</th>
+          </tr>
+          {% for song, artist, value in top_songs %}
+          <tr>
+            <td>{{ song }}</td>
+            <td>{{ artist }}</td>
+            <td>{{ value }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </main>
+  </body>
+</html>
