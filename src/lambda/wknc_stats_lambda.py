@@ -68,13 +68,13 @@ class Spin:
         )
 
     @classmethod
-    def from_dict(cls, spin_dict: dict[str, Any]) -> Spin:
+    def from_dict(cls, spin: dict[str, Any]) -> Spin:
         return cls(
-            id_=spin_dict["id"],
-            artist=spin_dict["artist"],
-            song=spin_dict["song"],
-            start=cls.parse_utc_string(spin_dict["start"]),
-            end=cls.parse_utc_string(spin_dict["end"]),
+            id_=spin["id"],
+            artist=spin["artist"],
+            song=spin["song"],
+            start=cls.parse_utc_string(spin["start"]),
+            end=cls.parse_utc_string(spin["end"]),
         )
 
 
@@ -86,7 +86,7 @@ class SpinHistory:
     @property
     def most_recent_spin(self) -> Spin:
         if not self.spins:
-            raise ValueError("No spins exits")
+            raise ValueError("No spins exist")
         return max(self.spins.values(), key=lambda spin: spin.start)
 
     def purge_old_spins(self, boundary: datetime) -> None:
@@ -102,12 +102,14 @@ class SpinHistory:
         self.spins = {**self.spins, **{spin.id_: spin for spin in new_spins}}
 
     def write_to_s3(self) -> None:
+        logger.info("Writing spins to s3...")
         content = dumps(asdict(self), indent=2, default=str)
         s3.put_object(
             Body=content,
             Bucket=DATA_BUCKET,
             Key=DATA_KEY,
         )
+        logger.info("Wrote %d spins to s3", len(self.spins))
 
     def find_trending_artists(self) -> list[tuple[str, int]]:
         middle = self.most_recent_spin.start - DAYS / 2
@@ -117,11 +119,12 @@ class SpinHistory:
                 scores[spin.artist] += 1
             else:
                 scores[spin.artist] -= 1
-        return sorted(
+        sorted_scores = sorted(
             [(artist, score) for artist, score in scores.items()],
             key=lambda x: x[1],
             reverse=True,
-        )[:5]
+        )
+        return sorted_scores[:5]
 
     def find_top_artists(self) -> list[tuple[str, int]]:
         artists = [spin.artist for spin in self.spins.values()]
@@ -139,7 +142,7 @@ class SpinHistory:
             obj = s3.get_object(Bucket=DATA_BUCKET, Key=DATA_KEY)
             content = loads(obj["Body"].read().decode("utf-8"))
             spin_history = fromdict(SpinHistory, content)
-            logger.info("Loaded %d songs from S3", len(spin_history.spins))
+            logger.info("Loaded %d spins from S3", len(spin_history.spins))
             return spin_history
         except (ClientError, JSONWizardError) as e:
             logger.warning("Could not load spin history from s3.", exc_info=e)
