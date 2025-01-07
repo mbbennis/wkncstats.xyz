@@ -131,7 +131,7 @@ class SpinHistory:
         return Counter(artists).most_common(10)
 
     def find_top_songs(self) -> list[tuple[str, str, int]]:
-        songs = [(spin.artist, spin.song) for spin in self.spins.values()]
+        songs = [(spin.song, spin.artist) for spin in self.spins.values()]
         top_songs = Counter(songs).most_common(10)
         return [(*song[0], song[1]) for song in top_songs]
 
