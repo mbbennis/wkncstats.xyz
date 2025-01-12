@@ -21,4 +21,3 @@ variable "error_object_key" {
 variable "static_folder_path" {
   type = string
 }
-

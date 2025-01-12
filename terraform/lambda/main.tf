@@ -1,5 +1,11 @@
-locals {
-  //  zip_file_path = "${path.module}/../../dist/lambda.zip"
+terraform {
+  required_version = "~> 1.5.7"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 
 data "aws_s3_bucket" "data_bucket" {
@@ -98,6 +104,3 @@ resource "aws_lambda_function" "update_lambda" {
     }
   }
 }
-
-
-
