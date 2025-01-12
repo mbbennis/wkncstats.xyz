@@ -8,7 +8,6 @@ from datetime import timedelta
 from datetime import timezone
 from json import dumps
 from json import loads
-from logging import basicConfig
 from logging import getLogger
 from os import environ
 from pathlib import Path
@@ -37,11 +36,7 @@ WEBSITE_KEY: Final = environ.get("WEBSITE_KEY", "index.html")
 REQUEST_DELAY_SECONDS: Final = float(environ.get("REQUEST_DELAY_SECONDS", 3))
 
 logger = getLogger(__name__)
-basicConfig(
-    level=environ.get("LOG_LEVEL", "INFO"),
-    format="[%(asctime)s %(levelname)s] %(message)s",
-    datefmt="%m-%d-%y %H:%M",
-)
+logger.setLevel(environ.get("LOG_LEVEL", "INFO"))
 
 s3 = client("s3")
 
