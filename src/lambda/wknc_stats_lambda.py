@@ -6,6 +6,7 @@ from dataclasses import field
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+from html import escape
 from json import dumps
 from json import loads
 from logging import getLogger
@@ -57,7 +58,7 @@ class Spin:
     end: datetime
 
     @staticmethod
-    def parse_utc_string(utc_string: str) -> datetime:
+    def __parse_utc_string(utc_string: str) -> datetime:
         return datetime.strptime(utc_string, "%Y-%m-%dT%H:%M:%SZ").replace(
             tzinfo=timezone.utc,
         )
@@ -68,8 +69,8 @@ class Spin:
             id_=spin["id"],
             artist=spin["artist"],
             song=spin["song"],
-            start=cls.parse_utc_string(spin["start"]),
-            end=cls.parse_utc_string(spin["end"]),
+            start=cls.__parse_utc_string(spin["start"]),
+            end=cls.__parse_utc_string(spin["end"]),
         )
 
 
@@ -79,12 +80,12 @@ class SpinHistory:
     spins: dict[str, Spin] = field(default_factory=dict)
 
     @property
-    def most_recent_spin(self) -> Spin:
+    def __most_recent_spin(self) -> Spin:
         if not self.spins:
             raise ValueError("No spins exist")
         return max(self.spins.values(), key=lambda spin: spin.start)
 
-    def purge_old_spins(self, boundary: datetime) -> None:
+    def __purge_old_spins(self, boundary: datetime) -> None:
         original_length = len(self.spins)
         self.spins = {
             key: value for key, value in self.spins.items() if value.start > boundary
@@ -92,9 +93,35 @@ class SpinHistory:
         spins_removed = original_length - len(self.spins)
         logger.info("Removed %d old spins", spins_removed)
 
-    def fetch_spins_from_api(self, start, end) -> None:
+    def __fetch_spins_from_api(self, start, end) -> None:
         new_spins = WkncApiClient().fetch_spins(start, end)
         self.spins = {**self.spins, **{spin.id_: spin for spin in new_spins}}
+
+    @classmethod
+    def load_from_s3(cls) -> SpinHistory:
+        logger.info("Loading spins from S3...")
+        try:
+            obj = s3.get_object(Bucket=DATA_BUCKET, Key=DATA_KEY)
+            content = loads(obj["Body"].read().decode("utf-8"))
+            spin_history = fromdict(SpinHistory, content)
+            logger.info("Loaded %d spins from S3", len(spin_history.spins))
+            return spin_history
+        except (ClientError, JSONWizardError) as e:
+            logger.warning("Could not load spin history from s3.", exc_info=e)
+            return cls()
+
+    @staticmethod
+    def load() -> SpinHistory:
+        spin_history = SpinHistory.load_from_s3()
+
+        now = datetime.now(timezone.utc)
+        spin_history.__purge_old_spins(now - DAYS)
+        start = (
+            spin_history.__most_recent_spin.start if spin_history.spins else now - DAYS
+        )
+
+        spin_history.__fetch_spins_from_api(start, now)
+        return spin_history
 
     def write_to_s3(self) -> None:
         logger.info("Writing spins to s3...")
@@ -107,7 +134,7 @@ class SpinHistory:
         logger.info("Wrote %d spins to s3", len(self.spins))
 
     def find_trending_artists(self) -> list[tuple[str, int]]:
-        middle = self.most_recent_spin.start - DAYS / 2
+        middle = self.__most_recent_spin.start - DAYS / 2
         scores = {spin.artist: 0 for spin in self.spins.values()}
         for spin in self.spins.values():
             if spin.start > middle:
@@ -130,56 +157,24 @@ class SpinHistory:
         top_songs = Counter(songs).most_common(10)
         return [(*song[0], song[1]) for song in top_songs]
 
-    @classmethod
-    def load_from_s3(cls) -> SpinHistory:
-        logger.info("Loading spins from S3...")
-        try:
-            obj = s3.get_object(Bucket=DATA_BUCKET, Key=DATA_KEY)
-            content = loads(obj["Body"].read().decode("utf-8"))
-            spin_history = fromdict(SpinHistory, content)
-            logger.info("Loaded %d spins from S3", len(spin_history.spins))
-            return spin_history
-        except (ClientError, JSONWizardError) as e:
-            logger.warning("Could not load spin history from s3.", exc_info=e)
-            return cls()
-
-    @staticmethod
-    def load() -> SpinHistory:
-        spin_history = SpinHistory.load_from_s3()
-
-        now = datetime.now(timezone.utc)
-        spin_history.purge_old_spins(now - DAYS)
-        start = (
-            spin_history.most_recent_spin.start if spin_history.spins else now - DAYS
-        )
-
-        spin_history.fetch_spins_from_api(start, now)
-        return spin_history
-
 
 class WkncApiClient:
 
     @staticmethod
-    def convert_utc_to_et(utc_dt: datetime) -> str:
+    def __convert_utc_to_et(utc_dt: datetime) -> str:
         """Converts a UTC datetime object to an ET timestamp."""
         return utc_dt.astimezone(ZoneInfo("US/Eastern")).strftime("%Y-%m-%d %H:%M")
 
-    def fetch_spins(self, start: datetime, end: datetime) -> list[Spin]:
-        spins = self.make_spin_request(start, end)
+    @staticmethod
+    def __sanitize_response_data(spins: list[Spin]) -> None:
+        max_length: Final = 100
+        for spin in spins:
+            spin.id_ = escape(spin.id_)[:max_length]
+            spin.artist = escape(spin.artist)[:max_length]
+            spin.song = escape(spin.song)[:max_length]
 
-        # The API returns a max of 100 records per request.
-        # Keep requesting a shorter time window until all of the records are returned.
-        spins_in_response = len(spins)
-        while spins_in_response == 100:
-            sleep(REQUEST_DELAY_SECONDS)
-            earliest_time = min(spins, key=lambda spin: spin.start).start
-            next_spins = self.make_spin_request(start, earliest_time)
-            spins_in_response = len(next_spins)
-            spins += next_spins
-        return spins
-
-    def make_spin_request(
-        self,
+    @staticmethod
+    def __make_spin_request(
         start: datetime,
         end: datetime,
         retries: int = 5,
@@ -196,8 +191,8 @@ class WkncApiClient:
 
         params: dict[str, int | str] = {
             "station": 1,
-            "start": self.convert_utc_to_et(start),
-            "end": self.convert_utc_to_et(end),
+            "start": WkncApiClient.__convert_utc_to_et(start),
+            "end": WkncApiClient.__convert_utc_to_et(end),
         }
         response = http.get(
             "https://wknc.org/wp-json/wknc/v1/spins",
@@ -205,7 +200,24 @@ class WkncApiClient:
         )
 
         spins = [Spin.from_dict(spin) for spin in loads(response.content)]
+        WkncApiClient.__sanitize_response_data(spins)
         logger.info("Fetched %d spins from %s to %s", len(spins), start, end)
+        return spins
+
+    @staticmethod
+    def fetch_spins(start: datetime, end: datetime) -> list[Spin]:
+        spins = WkncApiClient.__make_spin_request(start, end)
+
+        # The API returns a max of 100 records per request.
+        # Keep requesting a shorter time window until all of the records are returned.
+        spins_in_response = len(spins)
+        while spins_in_response == 100:
+            sleep(REQUEST_DELAY_SECONDS)
+            earliest_time = min(spins, key=lambda spin: spin.start).start
+            next_spins = WkncApiClient.__make_spin_request(
+                start, earliest_time)
+            spins_in_response = len(next_spins)
+            spins += next_spins
         return spins
 
 
