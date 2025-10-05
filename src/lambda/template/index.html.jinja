@@ -15,7 +15,7 @@
       <div class="trending">
         <h2>Trending artists</h2>
         <table>
-          {% for artist, value in trending_artists %}
+          {% for artist, value in trending_artists.items() %}
           <tr>
             {% if value >= 15 %}
               {% set trend_color = "trend-color-1" -%}
@@ -37,7 +37,7 @@
             <th>Artist</th>
             <th>Count</th>
           </tr>
-          {% for artist, value in top_artists %}
+          {% for artist, value in top_artists.items() %}
           <tr>
             <td>{{ artist }}</td>
             <td>{{ value }}</td>
@@ -53,10 +53,10 @@
             <th>Artist</th>
             <th>Count</th>
           </tr>
-          {% for song, artist, value in top_songs %}
+          {% for key, value in top_songs.items() %}
           <tr>
-            <td>{{ song }}</td>
-            <td>{{ artist }}</td>
+            <td>{{ key[1] }}</td>
+            <td>{{ key[0] }}</td>
             <td>{{ value }}</td>
           </tr>
           {% endfor %}

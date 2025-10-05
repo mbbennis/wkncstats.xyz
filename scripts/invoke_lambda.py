@@ -35,8 +35,7 @@ def invoke_lambda(function_name, payload) -> str | None:
 if __name__ == "__main__":
     lambda_function_name = "wknc-stats-update-lambda"
 
-    response = invoke_lambda(
-        function_name="wknc-stats-update-lambda", payload={})
+    response = invoke_lambda(function_name="wknc-stats-update-lambda", payload={})
 
     if response:
         print("Lambda response:", response)
