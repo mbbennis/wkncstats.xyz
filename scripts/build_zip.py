@@ -25,7 +25,14 @@ def build_lambda_zip() -> None:
 
     # Install dependencies into the build directory
     run(
-        ["pip", "install", "-r", str(requirements_file), "--target", str(build_dir)],
+        [
+            "pip",
+            "install",
+            f"--requirement={str(requirements_file)}",
+            f"--target={str(build_dir)}",
+            "--platform=manylinux2014_x86_64",
+            "--only-binary=:all:",
+        ],
         check=True,
     )
 
