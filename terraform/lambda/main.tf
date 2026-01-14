@@ -1,9 +1,9 @@
 terraform {
-  required_version = "~> 1.5.7"
+  required_version = "~> 1.5"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
   }
 }
@@ -81,9 +81,16 @@ resource "aws_cloudwatch_log_group" "log_group" {
   retention_in_days = 7
 }
 
+resource "aws_s3_object" "lambda_code" {
+  bucket = var.data_bucket_name
+  key    = "wknc-stats-update-lambda.zip"
+  source = var.zip_file_path
+}
+
 resource "aws_lambda_function" "update_lambda" {
   function_name = var.lambda_function_name
-  filename      = var.zip_file_path
+  s3_bucket     = aws_s3_object.lambda_code.bucket
+  s3_key        = aws_s3_object.lambda_code.key
   handler       = var.lambda_function_handler
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.13"

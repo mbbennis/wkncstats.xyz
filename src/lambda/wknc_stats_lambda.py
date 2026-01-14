@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from html import escape
 from io import StringIO
-from logging import basicConfig, getLogger
+from logging import getLogger
 from os import environ
 from pathlib import Path
 from time import sleep
@@ -19,13 +19,13 @@ from requests import Response, Session
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-basicConfig(level=environ.get("LOG_LEVEL", "INFO"))
-logger = getLogger(__name__)
+getLogger().setLevel(environ.get("LOG_LEVEL", "INFO"))
+logger = getLogger()
 
 DAYS: Final = timedelta(days=30)
 DATA_BUCKET: Final = environ.get("DATA_BUCKET", "wknc-stats-data")
 DATA_KEY: Final = environ.get("DATA_KEY", "data/spins.csv")
-WEBSITE_BUCKET: Final = environ.get("WEBSITE_BUCKET", "www.wkncstats.xyz")
+WEBSITE_BUCKET: Final = environ.get("WEBSITE_BUCKET", "wkncstats.xyz")
 WEBSITE_KEY: Final = environ.get("WEBSITE_KEY", "index.html")
 REQUEST_DELAY_SECONDS: Final = float(environ.get("REQUEST_DELAY_SECONDS", 3))
 

@@ -24,6 +24,7 @@ repos:
       name: ty check
       entry: uvx ty check . --ignore unresolved-import
       language: python
+      types: [python]
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.14.0
     hooks:
